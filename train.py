@@ -51,20 +51,20 @@ if __name__ == '__main__':
 
     # Load default config and override hyperparameters using dict access
     args = pufferlib.pufferl.load_config('default')
-    args['train']['total_timesteps'] = 1000000
-    args['train']['learning_rate'] = 0.0005
+    args['train']['total_timesteps'] = 100000
+    args['train']['learning_rate'] = 0.001
     args['train']['num_steps'] = 256
     args['train']['batch_size'] = 8 * 256  # num_envs * num_steps
     args['train']['minibatch_size'] = 256  # batch_size // desired num_minibatches (e.g., 4)
-    args['train']['update_epochs'] = 4
+    args['train']['update_epochs'] = 10
     args['train']['gamma'] = 0.99
     args['train']['gae_lambda'] = 0.95
     args['train']['clip_coef'] = 0.2
     args['train']['norm_adv'] = True
     args['train']['clip_vloss'] = True
     args['train']['ent_coef'] = 0.00
-    args['train']['vf_coef'] = 0.5
-    args['train']['max_grad_norm'] = 0.5
+    args['train']['vf_coef'] = 0.1
+    args['train']['max_grad_norm'] = 0.1
     args['train']['anneal_lr'] = True
     args['train']['seed'] = 42
     args['train']['device'] = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -81,39 +81,12 @@ if __name__ == '__main__':
     trainer = pufferlib.pufferl.PuffeRL(config=args['train'], vecenv=vecenv, policy=policy, logger=logger)
 
     # Training loop
-    for epoch in range(100):
+    for epoch in range(1000):
         trainer.evaluate()
         logs = trainer.train()
 
     trainer.print_dashboard()
 
-    # Manual evaluation (10 episodes)
-    eval_env = make_env(render_mode='human')
-    rewards = []
-    lengths = []
-    for ep in range(100):
-        obs, info = eval_env.reset()
-        episode_reward = 0
-        episode_length = 0
-        done = False
-        while not done:
-            with torch.no_grad():
-                obs_tensor = torch.tensor(obs).unsqueeze(0).to(args['train']['device'])
-                logits, values = policy(obs_tensor)
-                action = torch.distributions.Categorical(logits=logits).sample().item()
-            next_obs, reward, terminated, truncated, info = eval_env.step(action)
-            episode_reward += reward
-            episode_length += 1
-            done = terminated or truncated
-            obs = next_obs
-        rewards.append(episode_reward)
-        lengths.append(episode_length)
-        print(f"Eval Episode {ep}: Reward={episode_reward}, Length={episode_length}")
-
-    print(f"Mean Eval Reward: {np.mean(rewards)}, Mean Length: {np.mean(lengths)}")
-
-    # Cleanup
     trainer.close()
-    eval_env.close()
 
     print("Training complete!")
